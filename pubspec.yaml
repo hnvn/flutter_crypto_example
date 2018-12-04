@@ -25,4 +25,3 @@ flutter:
 
   assets:
     - assets/keypair.json
-    - assets/aeskey.json

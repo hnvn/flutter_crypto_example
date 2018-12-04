@@ -243,9 +243,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   _loadAESKey() async {
-    final aesKeyJson = await rootBundle.loadString('assets/aeskey.json');
-    final aesKeyMap = json.decode(aesKeyJson);
-    _aesKeyPair = KeyPair.fromJwk(aesKeyMap);
+    final secretKey = 'ubKq0tzN5a2OBGhB';
+    _aesKeyPair =
+        KeyPair.symmetric(SymmetricKey(keyValue: utf8.encode(secretKey)));
   }
 
   _doRSAEncrypt() async {
