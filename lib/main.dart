@@ -5,6 +5,7 @@ import 'package:crypto_keys/crypto_keys.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:math';
 
 void main() => runApp(MyApp());
 
@@ -243,7 +244,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   _loadAESKey() async {
-    final secretKey = 'ubKq0tzN5a2OBGhB';
+//    final secretKey = 'ubKq0tzN5a2OBGhB';
+    final secretKey = _randomString(16);
+    print('secret key: $secretKey');
     _aesKeyPair =
         KeyPair.symmetric(SymmetricKey(keyValue: utf8.encode(secretKey)));
   }
@@ -312,5 +315,17 @@ class _HomePageState extends State<HomePage> {
         _aesKeyPair.privateKey.createEncrypter(algorithms.encryption.aes.cbc);
     final output = decrypter.decrypt(input);
     return String.fromCharCodes(output);
+  }
+
+  final chars =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  String _randomString(int strlen) {
+    Random rnd = new Random(new DateTime.now().millisecondsSinceEpoch);
+    String result = "";
+    for (var i = 0; i < strlen; i++) {
+      result += chars[rnd.nextInt(chars.length)];
+    }
+    return result;
   }
 }
