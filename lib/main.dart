@@ -22,6 +22,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
+enum EncryptMode { non, rsa, aes }
+
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
@@ -33,14 +35,19 @@ class _HomePageState extends State<HomePage> {
   final _encryptedTextController = StreamController<String>();
   final _decryptedTextController = StreamController<String>();
 
-  KeyPair _keyPair;
+  KeyPair _rsaKeyPair;
+  KeyPair _aesKeyPair;
   EncryptionResult _encryptionResult;
+
+  EncryptMode _encryptMode = EncryptMode.non;
 
   @override
   void initState() {
     super.initState();
 
     _loadRSAKey();
+
+    _loadAESKey();
   }
 
   @override
@@ -88,17 +95,42 @@ class _HomePageState extends State<HomePage> {
               Padding(
                 padding: EdgeInsets.only(top: 24.0),
                 child: StreamBuilder(
-                  builder: (_, snapshot) => RaisedButton(
-                        color: theme.primaryColor,
-                        disabledColor: Colors.grey[400],
-                        disabledTextColor: Colors.white,
-                        textColor: Colors.white,
-                        onPressed: snapshot.data ?? false
-                            ? () {
-                                _doEncrypt();
-                              }
-                            : null,
-                        child: Text('Encrypt'),
+                  builder: (_, snapshot) => Row(
+                        mainAxisSize: MainAxisSize.max,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          RaisedButton(
+                            color: theme.primaryColor,
+                            disabledColor: Colors.grey[400],
+                            disabledTextColor: Colors.white,
+                            textColor: Colors.white,
+                            onPressed: (snapshot.data ?? false) &&
+                                    _encryptMode != EncryptMode.aes
+                                ? () {
+                                    _encryptMode = EncryptMode.rsa;
+                                    _doRSAEncrypt();
+                                  }
+                                : null,
+                            child: Text('Encrypt with RSA'),
+                          ),
+                          SizedBox(
+                            width: 48.0,
+                          ),
+                          RaisedButton(
+                            color: theme.primaryColor,
+                            disabledColor: Colors.grey[400],
+                            disabledTextColor: Colors.white,
+                            textColor: Colors.white,
+                            onPressed: (snapshot.data ?? false) &&
+                                    _encryptMode != EncryptMode.rsa
+                                ? () {
+                                    _encryptMode = EncryptMode.aes;
+                                    _doAESEncrypt();
+                                  }
+                                : null,
+                            child: Text('Encrypt with AES'),
+                          ),
+                        ],
                       ),
                   stream: _buttonActiveController.stream,
                 ),
@@ -141,7 +173,14 @@ class _HomePageState extends State<HomePage> {
                                     width: 48.0,
                                   ),
                                   RaisedButton(
-                                    onPressed: _doDecrypt,
+                                    onPressed: () {
+                                      if (_encryptMode == EncryptMode.rsa) {
+                                        _doRSADecrypt();
+                                      } else if (_encryptMode ==
+                                          EncryptMode.aes) {
+                                        _doAESDecrypt();
+                                      }
+                                    },
                                     child: Text(
                                       'Decrypt',
                                     ),
@@ -200,19 +239,38 @@ class _HomePageState extends State<HomePage> {
   _loadRSAKey() async {
     final keyPairJson = await rootBundle.loadString('assets/keypair.json');
     final keyPairMap = json.decode(keyPairJson);
-    _keyPair = KeyPair.fromJwk(keyPairMap);
+    _rsaKeyPair = KeyPair.fromJwk(keyPairMap);
   }
 
-  _doEncrypt() async {
+  _loadAESKey() async {
+    final aesKeyJson = await rootBundle.loadString('assets/aeskey.json');
+    final aesKeyMap = json.decode(aesKeyJson);
+    _aesKeyPair = KeyPair.fromJwk(aesKeyMap);
+  }
+
+  _doRSAEncrypt() async {
     final text = _plainTextController.text;
-    final encryptedText = await _encrypt(text);
-    print('Encrypted Text: $encryptedText');
+    final encryptedText = await _encryptRSA(text);
+    print('RSA Encrypted Text: $encryptedText');
     _encryptedTextController.sink.add(encryptedText);
   }
 
-  _doDecrypt() async {
-    final decryptedText = await _decrypt(_encryptionResult);
-    print('Decrypted Text: $decryptedText');
+  _doRSADecrypt() async {
+    final decryptedText = await _decryptRSA(_encryptionResult);
+    print('RSA Decrypted Text: $decryptedText');
+    _decryptedTextController.add(decryptedText);
+  }
+
+  _doAESEncrypt() async {
+    final text = _plainTextController.text;
+    final encryptedText = await _encryptAES(text);
+    print('AES Encrypted Text: $encryptedText');
+    _encryptedTextController.sink.add(encryptedText);
+  }
+
+  _doAESDecrypt() async {
+    final decryptedText = await _decryptAES(_encryptionResult);
+    print('AES Decrypted Text: $decryptedText');
     _decryptedTextController.add(decryptedText);
   }
 
@@ -222,19 +280,36 @@ class _HomePageState extends State<HomePage> {
     _encryptedTextController.add(null);
     _decryptedTextController.add(null);
     _encryptionResult = null;
+    _encryptMode = EncryptMode.non;
     setState(() {});
   }
 
-  Future<String> _encrypt(String input) async {
+  Future<String> _encryptRSA(String input) async {
     final encrypter =
-        _keyPair.publicKey.createEncrypter(algorithms.encryption.rsa.pkcs1);
+        _rsaKeyPair.publicKey.createEncrypter(algorithms.encryption.rsa.pkcs1);
     _encryptionResult = encrypter.encrypt(Uint8List.fromList(input.codeUnits));
     return Base64Encoder().convert(_encryptionResult.data);
   }
 
-  Future<String> _decrypt(EncryptionResult input) async {
+  Future<String> _decryptRSA(EncryptionResult input) async {
     final decrypter =
-        _keyPair.privateKey.createEncrypter(algorithms.encryption.rsa.pkcs1);
+        _rsaKeyPair.privateKey.createEncrypter(algorithms.encryption.rsa.pkcs1);
+    final output = decrypter.decrypt(input);
+    return String.fromCharCodes(output);
+  }
+
+  Future<String> _encryptAES(String input) async {
+    final encrypter =
+        _aesKeyPair.publicKey.createEncrypter(algorithms.encryption.aes.cbc);
+    _encryptionResult = encrypter.encrypt(Uint8List.fromList(input.codeUnits),
+        initializationVector: Uint8List.fromList(
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+    return Base64Encoder().convert(_encryptionResult.data);
+  }
+
+  Future<String> _decryptAES(EncryptionResult input) async {
+    final decrypter =
+        _aesKeyPair.privateKey.createEncrypter(algorithms.encryption.aes.cbc);
     final output = decrypter.decrypt(input);
     return String.fromCharCodes(output);
   }

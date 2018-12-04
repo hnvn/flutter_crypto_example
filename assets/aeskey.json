@@ -1,0 +1,6 @@
+{
+  "kty": "oct",
+  "kid": "88669af7-e93d-4209-8098-5ca232e8e196",
+  "k": "dWJLcTB0ek41YTJPQkdoQg",
+  "alg": "AES/CBC/PKCS7Padding"
+}
